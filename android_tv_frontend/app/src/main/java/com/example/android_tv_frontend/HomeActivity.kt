@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -25,35 +26,28 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import java.io.File
 
 /**
  * HTML-to-Compose mapping:
@@ -62,7 +56,7 @@ import coil.request.ImageRequest
  *   - nav buttons (Inicio, Películas...) -> Row of focusable text buttons
  *   - active pill -> rounded container behind selected tab
  *   - avatar/search icons -> placeholder icons (optional)
- * - highlights -> HeroBanner(image: assets/figmaimages/figma_image_1_13.png)
+ * - highlights -> HeroBanner(image: figma_image_1_13.png)
  * - seguí viendo -> CarouselRow(title="Seguí viendo", items: content cards with poster + progress + title)
  * - canales de TV -> CarouselRow(title="Canales de TV", items: tv cards with left image + play + info)
  *
@@ -72,7 +66,8 @@ import coil.request.ImageRequest
  *
  * Image loading:
  * - Coil AsyncImage with placeholders and error tint
- * - Hero image uses loading = eager (preload on composition)
+ * - All image sources are loaded from absolute file:// paths:
+ *   /home/kavia/workspace/code-generation/assets/figmaimages/<filename>
  *
  * TV Hooks:
  * - ExoPlayer-ready: onCardClick will call a stub function where player can be attached later
@@ -111,7 +106,7 @@ fun HomeScreen() {
         )
         Spacer(Modifier.height(32.dp))
         HeroBanner(
-            imagePath = "assets/figmaimages/figma_image_1_13.png",
+            imagePath = "figma_image_1_13.png",
             width = 1744.dp,
             height = 444.dp
         )
@@ -121,11 +116,11 @@ fun HomeScreen() {
             cardWidth = 412.dp,
             cardHeight = 312.dp,
             items = listOf(
-                CardItem("Rogue One", "assets/figmaimages/figma_image_1_41.png"),
-                CardItem("Ex Machina", "assets/figmaimages/figma_image_1_68.png"),
-                CardItem("Sing Street", "assets/figmaimages/figma_image_1_85.png"),
-                CardItem("2012", "assets/figmaimages/figma_image_1_102.png"),
-                CardItem("Ad Astra", "assets/figmaimages/figma_image_1_119.png"),
+                CardItem("Rogue One", "figma_image_1_41.png"),
+                CardItem("Ex Machina", "figma_image_1_68.png"),
+                CardItem("Sing Street", "figma_image_1_85.png"),
+                CardItem("2012", "figma_image_1_102.png"),
+                CardItem("Ad Astra", "figma_image_1_119.png"),
             ),
             eagerFirstImage = false
         )
@@ -135,9 +130,9 @@ fun HomeScreen() {
             cardWidth = 745.dp,
             cardHeight = 212.dp,
             items = listOf(
-                CardItem("Marca Claro Radio", "assets/figmaimages/figma_image_1_154.png", subtitle = "004 | Claro sports"),
-                CardItem("E.T.", "assets/figmaimages/figma_image_1_179.png", subtitle = "005 | HBO Channel", overlay = "assets/figmaimages/figma_image_1_180.png"),
-                CardItem("Marca Claro Radio", "assets/figmaimages/figma_image_1_218.png", subtitle = "004 | Claro sports"),
+                CardItem("Marca Claro Radio", "figma_image_1_154.png", subtitle = "004 | Claro sports"),
+                CardItem("E.T.", "figma_image_1_179.png", subtitle = "005 | HBO Channel", overlay = "figma_image_1_180.png"),
+                CardItem("Marca Claro Radio", "figma_image_1_218.png", subtitle = "004 | Claro sports"),
             ),
             isTvChannel = true
         )
@@ -241,10 +236,10 @@ private fun FocusablePillText(
 
 @Composable
 private fun HeroBanner(imagePath: String, width: Dp, height: Dp) {
-    // Eager load hero
+    // Eager load hero from absolute file path
     AsyncImage(
         model = ImageRequest.Builder(LocalContextProvider())
-            .data(imagePath)
+            .data(figmaImage(imagePath)) // absolute file path
             .crossfade(true)
             .build(),
         contentDescription = "Destacado",
@@ -313,13 +308,13 @@ private fun PosterProgressCard(item: CardItem, width: Dp, height: Dp, eager: Boo
         ) {
             AsyncImage(
                 model = ImageRequest.Builder(LocalContextProvider())
-                    .data(item.image)
+                    .data(figmaImage(item.image)) // absolute file path
                     .crossfade(true)
                     .build(),
                 contentDescription = item.title,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
-                    .matchParentSize()
+                    .fillMaxSize()
                     .clip(RoundedCornerShape(8.dp))
                     .borderGlow(borderColor)
             )
@@ -378,7 +373,7 @@ private fun TvChannelCard(item: CardItem, width: Dp, height: Dp) {
         ) {
             AsyncImage(
                 model = ImageRequest.Builder(LocalContextProvider())
-                    .data(item.image)
+                    .data(figmaImage(item.image)) // absolute file path
                     .crossfade(true)
                     .build(),
                 contentDescription = item.title,
@@ -391,7 +386,7 @@ private fun TvChannelCard(item: CardItem, width: Dp, height: Dp) {
             item.overlay?.let {
                 AsyncImage(
                     model = ImageRequest.Builder(LocalContextProvider())
-                        .data(it)
+                        .data(figmaImage(it)) // absolute file path
                         .crossfade(true)
                         .build(),
                     contentDescription = null,
@@ -531,3 +526,16 @@ private fun StreamXTVTheme(content: @Composable () -> Unit) {
 // Helper to get a context inside composables for ImageRequest builder
 @Composable
 private fun LocalContextProvider() = androidx.compose.ui.platform.LocalContext.current
+
+// Base absolute path for Figma images
+private const val FIGMA_IMAGES_ABS_PATH = "/home/kavia/workspace/code-generation/assets/figmaimages"
+
+/**
+ * Build an absolute file path for figma images residing under FIGMA_IMAGES_ABS_PATH.
+ * Accepts either a plain filename ("figma_image_1_13.png") or a relative path like
+ * "figmaimages/figma_image_1_13.png" or "assets/figmaimages/figma_image_1_13.png".
+ */
+private fun figmaImage(nameOrPath: String): File {
+    val fileName = nameOrPath.substringAfterLast('/')
+    return File(FIGMA_IMAGES_ABS_PATH, fileName)
+}
