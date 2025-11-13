@@ -1,0 +1,4 @@
+{
+    "command": "./gradlew dependencies",
+    "working_directory": "/home/kavia/workspace/code-generation/streamx-ott-streaming-platform-90494/android_tv_frontend"
+}
