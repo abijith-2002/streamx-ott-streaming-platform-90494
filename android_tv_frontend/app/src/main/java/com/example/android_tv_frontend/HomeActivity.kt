@@ -11,10 +11,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
-
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -23,7 +21,6 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableIntStateOf
@@ -38,8 +35,13 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.foundation.layout.matchParentSize
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -47,31 +49,37 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.example.android_tv_frontend.ui.StreamXTVTheme
+import com.example.android_tv_frontend.ui.TvColors
+import com.example.android_tv_frontend.ui.TvRadius
+import com.example.android_tv_frontend.ui.TvTypography
+import com.example.android_tv_frontend.ui.TvSpacing
+import com.example.android_tv_frontend.ui.TagChip
+import com.example.android_tv_frontend.ui.TvIconButton
+import com.example.android_tv_frontend.ui.HeroBanner
+import com.example.android_tv_frontend.ui.RowSection
+import com.example.android_tv_frontend.ui.PosterCard
+import com.example.android_tv_frontend.ui.SvgImage
+import com.example.android_tv_frontend.ui.figmaImage
+import com.example.android_tv_frontend.ui.borderGlow
 import java.io.File
 
 /**
- * HTML-to-Compose mapping:
- * - header -> HeaderBar()
- *   - logo pieces -> simplified logo box (could be replaced with Image if needed)
- *   - nav buttons (Inicio, Películas...) -> Row of focusable text buttons
- *   - active pill -> rounded container behind selected tab
- *   - avatar/search icons -> placeholder icons (optional)
- * - highlights -> HeroBanner(image: figma_image_1_13.png)
- * - seguí viendo -> CarouselRow(title="Seguí viendo", items: content cards with poster + progress + title)
- * - canales de TV -> CarouselRow(title="Canales de TV", items: tv cards with left image + play + info)
- *
- * Focus behavior:
- * - D-pad directional focus orders match: header -> hero -> first carousel -> second carousel
- * - Focus ring simulated via scale + border glow
- *
- * Image loading:
- * - Coil AsyncImage with placeholders and error tint
- * - All image sources are loaded from absolute file:// paths:
- *   /home/kavia/workspace/code-generation/assets/figmaimages/<filename>
- *
- * TV Hooks:
- * - ExoPlayer-ready: onCardClick will call a stub function where player can be attached later
- */
+HTML -> Composable mapping checklist (Home Screen)
+[✓] header (header) -> HeaderBar()
+    [✓] logo pieces (header__logo) -> LogoGroup() with layered SvgImage icons
+    [✓] nav buttons (Inicio, Películas, Series, TV en vivo, Kids, Mis Contenidos) -> FocusablePillText within HeaderBar()
+    [✓] active pill (header__active-pill) -> Focusable pill background on selected item
+    [✓] search icons (header__search--234/235/236) -> SearchIconGroup()
+    [✓] avatar (header__avatar) -> Avatar circle with image
+[✓] highlights (highlights__main-hero) -> HeroBanner(imageFileName="figma_image_1_13.png")
+[✓] "Seguí viendo" section -> RowSection with PosterCard items (poster + progress + title + icons for card 1)
+[✓] "Canales de TV" section -> RowSection with TvChannelCard items (left image + play + info + EN VIVO chip)
+[✓] icons/badges/overlays -> SvgImage for SVG icons; TagChip("EN VIVO"); overlay image support on TvChannelCard
+[✓] focus ring -> borderGlow + pill highlight; focusable() set on all interactive components
+[✓] accessibility -> contentDescription, semantics role labels, button roles
+[✓] images -> loaded via file:// using figmaImage helper from UI kit
+**/
 
 // PUBLIC_INTERFACE
 class HomeActivity : FragmentActivity() {
@@ -80,7 +88,7 @@ class HomeActivity : FragmentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             StreamXTVTheme {
-                Surface(modifier = Modifier.fillMaxSize(), color = Color(0xFF121212)) {
+                Surface(modifier = Modifier.fillMaxSize(), color = TvColors.Background) {
                     HomeScreen()
                 }
             }
@@ -95,7 +103,7 @@ fun HomeScreen() {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF121212))
+            .background(TvColors.Background)
             .padding(horizontal = 48.dp)
             .padding(top = 36.dp),
         verticalArrangement = Arrangement.Top,
@@ -105,37 +113,56 @@ fun HomeScreen() {
             items = listOf("Inicio", "Películas", "Series", "TV en vivo", "Kids", "Mis Contenidos")
         )
         Spacer(Modifier.height(32.dp))
+
+        // Hero banner
         HeroBanner(
-            imagePath = "figma_image_1_13.png",
+            imageFileName = "figma_image_1_13.png",
             width = 1744.dp,
             height = 444.dp
         )
+
         Spacer(Modifier.height(24.dp))
-        CarouselRow(
+
+        // Seguí viendo: Poster cards with progress and icons on the first card
+        val svItems = listOf(
+            CardItem("Rogue One", "figma_image_1_41.png", trailingIcons = listOf("figma_image_1_63.svg", "figma_image_1_61.svg", "figma_image_1_65.svg")),
+            CardItem("Ex Machina", "figma_image_1_68.png"),
+            CardItem("Sing Street", "figma_image_1_85.png"),
+            CardItem("2012", "figma_image_1_102.png"),
+            CardItem("Ad Astra", "figma_image_1_119.png"),
+        )
+        RowSection(
             title = "Seguí viendo",
-            cardWidth = 412.dp,
-            cardHeight = 312.dp,
-            items = listOf(
-                CardItem("Rogue One", "figma_image_1_41.png"),
-                CardItem("Ex Machina", "figma_image_1_68.png"),
-                CardItem("Sing Street", "figma_image_1_85.png"),
-                CardItem("2012", "figma_image_1_102.png"),
-                CardItem("Ad Astra", "figma_image_1_119.png"),
-            ),
-            eagerFirstImage = false
-        )
+            items = svItems
+        ) { item ->
+            PosterCard(
+                width = 412.dp,
+                height = 312.dp,
+                imageFileName = item.image,
+                title = item.title,
+                progress = 0.4f,
+                trailingIcons = item.trailingIcons
+            )
+        }
+
         Spacer(Modifier.height(24.dp))
-        CarouselRow(
-            title = "Canales de TV",
-            cardWidth = 745.dp,
-            cardHeight = 212.dp,
-            items = listOf(
-                CardItem("Marca Claro Radio", "figma_image_1_154.png", subtitle = "004 | Claro sports"),
-                CardItem("E.T.", "figma_image_1_179.png", subtitle = "005 | HBO Channel", overlay = "figma_image_1_180.png"),
-                CardItem("Marca Claro Radio", "figma_image_1_218.png", subtitle = "004 | Claro sports"),
-            ),
-            isTvChannel = true
+
+        // Canales de TV
+        val tvItems = listOf(
+            CardItem("Marca Claro Radio", "figma_image_1_154.png", subtitle = "004 | Claro sports"),
+            CardItem("E.T.", "figma_image_1_179.png", subtitle = "005 | HBO Channel", overlay = "figma_image_1_180.png"),
+            CardItem("Marca Claro Radio", "figma_image_1_218.png", subtitle = "004 | Claro sports"),
         )
+        RowSection(
+            title = "Canales de TV",
+            items = tvItems
+        ) { item ->
+            TvChannelCard(
+                item = item,
+                width = 745.dp,
+                height = 212.dp
+            )
+        }
     }
 }
 
@@ -143,40 +170,46 @@ data class CardItem(
     val title: String,
     val image: String,
     val subtitle: String? = null,
-    val overlay: String? = null
+    val overlay: String? = null,
+    val trailingIcons: List<String> = emptyList()
 )
 
 @Composable
 private fun HeaderBar(items: List<String>) {
     var selectedIndex by remember { mutableIntStateOf(0) }
+
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
+        horizontalArrangement = Arrangement.Start,
         modifier = Modifier
             .fillMaxSize()
             .height(74.dp)
     ) {
-        // Simplified logo placeholder
-        Box(
-            modifier = Modifier
-                .size(width = 170.dp, height = 36.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .background(Color(0xFF28292F)),
-        )
+        // Logo pieces group (assembled from svg parts)
+        LogoGroup(modifier = Modifier.width(170.dp).height(36.dp))
+
         Spacer(Modifier.width(24.dp))
+
+        // Top navigation background with rounded pill
         Box(
             modifier = Modifier
                 .weight(1f)
                 .height(64.dp)
-                .clip(RoundedCornerShape(34.dp))
-                .background(Color(0xFF28292F))
+                .clip(RoundedCornerShape(TvRadius.R34))
+                .background(TvColors.NavBg)
                 .padding(horizontal = 16.dp),
             contentAlignment = Alignment.CenterStart
         ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(24.dp)
+            ) {
+                // Search Icon composition (three svg shapes)
+                SearchIconGroup()
+
                 items.forEachIndexed { index, label ->
                     val focusedColor = Color.White
-                    val unfocusedColor = Color(0xFF7F8282)
+                    val unfocusedColor = TvColors.GrayText
                     FocusablePillText(
                         text = label,
                         selected = selectedIndex == index,
@@ -187,14 +220,52 @@ private fun HeaderBar(items: List<String>) {
                 }
             }
         }
+
         Spacer(Modifier.width(24.dp))
+
         // Avatar
         Box(
             modifier = Modifier
                 .size(56.dp)
                 .clip(CircleShape)
-                .background(Color(0xFFE84444).copy(alpha = 0.15f))
+                .background(TvColors.AccentRed.copy(alpha = 0.15f))
+                .semantics { role = Role.Image }
                 .focusable(true),
+        ) {
+            // Load actual avatar image (56x56)
+            SvgOrImage("figma_image_1_231.png", "Avatar", Modifier.matchParentSize().clip(CircleShape))
+        }
+    }
+}
+
+@Composable
+private fun SearchIconGroup() {
+    Box(
+        modifier = Modifier
+            .width(40.dp)
+            .height(28.dp)
+    ) {
+        // Layer three search shapes to mimic HTML composition
+        com.example.android_tv_frontend.ui.SvgImage(
+            fileName = "figma_image_1_234.svg",
+            contentDescription = "Search decorative A",
+            modifier = Modifier
+                .size(28.dp)
+                .align(Alignment.CenterStart)
+        )
+        com.example.android_tv_frontend.ui.SvgImage(
+            fileName = "figma_image_1_236.svg",
+            contentDescription = "Search decorative C",
+            modifier = Modifier
+                .size(22.dp)
+                .align(Alignment.Center)
+        )
+        com.example.android_tv_frontend.ui.SvgImage(
+            fileName = "figma_image_1_235.svg",
+            contentDescription = "Search decorative B",
+            modifier = Modifier
+                .size(15.dp)
+                .align(Alignment.BottomEnd)
         )
     }
 }
@@ -208,12 +279,13 @@ private fun FocusablePillText(
     unfocusedColor: Color
 ) {
     var focused by remember { mutableStateOf(false) }
-    val pillColor = if (selected || focused) Color(0xFF9B0F0F) else Color.Transparent
+    val pillColor = if (selected || focused) TvColors.ActivePill else Color.Transparent
     val textColor = if (selected || focused) focusedColor else unfocusedColor
     val requester = remember { FocusRequester() }
+
     Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(37.dp))
+            .clip(RoundedCornerShape(TvRadius.R37))
             .background(pillColor)
             .padding(horizontal = 18.dp, vertical = 10.dp)
             .onFocusChanged {
@@ -225,9 +297,7 @@ private fun FocusablePillText(
     ) {
         androidx.compose.material3.Text(
             text = text,
-            color = textColor,
-            fontSize = 20.sp,
-            fontWeight = if (selected || focused) FontWeight.Bold else FontWeight.Normal,
+            style = TvTypography.Typo28.copy(color = textColor),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
@@ -235,128 +305,48 @@ private fun FocusablePillText(
 }
 
 @Composable
-private fun HeroBanner(imagePath: String, width: Dp, height: Dp) {
-    // Eager load hero from absolute file path
+private fun LogoGroup(modifier: Modifier = Modifier) {
+    // Assemble small logo glyphs as in HTML; placed within a small Box using offsets
+    Box(modifier = modifier.clip(RoundedCornerShape(8.dp)).background(TvColors.NavBg)) {
+        // Using offsets based on the HTML/CSS positions
+        // 9 pieces compose the logo (positions approximated to fit Box)
+        SvgImage("figma_image_1_249.svg", null, Modifier.size(16.dp).align(Alignment.CenterStart))
+        SvgImage("figma_image_1_255.svg", null, Modifier.size(15.dp).align(Alignment.CenterStart).offset(x = 18.dp))
+        SvgImage("figma_image_1_258.svg", null, Modifier.size(16.dp).align(Alignment.CenterStart).offset(x = 36.dp, y = (-4).dp))
+        SvgImage("figma_image_1_261.svg", null, Modifier.size(15.dp).align(Alignment.CenterStart).offset(x = 54.dp, y = (-4).dp))
+        SvgImage("figma_image_1_263.svg", null, Modifier.size(14.dp).align(Alignment.CenterStart).offset(x = 70.dp, y = (-12).dp))
+        SvgImage("figma_image_1_267.svg", null, Modifier.size(19.dp).align(Alignment.CenterStart).offset(x = 86.dp))
+        SvgImage("figma_image_1_268.svg", null, Modifier.size(10.dp).align(Alignment.CenterStart).offset(x = 107.dp, y = 6.dp))
+        SvgImage("figma_image_1_269.svg", null, Modifier.size(23.dp).align(Alignment.CenterStart).offset(x = 122.dp))
+        SvgImage("figma_image_1_274.svg", null, Modifier.size(11.dp).align(Alignment.CenterStart).offset(x = 150.dp, y = (-2).dp))
+    }
+}
+
+@Composable
+private fun SvgImage(fileName: String, contentDescription: String?, modifier: Modifier = Modifier) {
+    com.example.android_tv_frontend.ui.SvgImage(fileName = fileName, contentDescription = contentDescription, modifier = modifier)
+}
+
+@Composable
+private fun SvgOrImage(fileName: String, contentDescription: String?, modifier: Modifier = Modifier) {
+    // Convenience: load either svg or png using AsyncImage with figmaImage helper
+    val context = androidx.compose.ui.platform.LocalContext.current
     AsyncImage(
-        model = ImageRequest.Builder(LocalContextProvider())
-            .data(figmaImage(imagePath)) // absolute file path
+        model = ImageRequest.Builder(context)
+            .data(figmaImage(fileName))
             .crossfade(true)
             .build(),
-        contentDescription = "Destacado",
+        contentDescription = contentDescription,
         contentScale = ContentScale.Crop,
-        modifier = Modifier
-            .width(width)
-            .height(height)
-            .clip(RoundedCornerShape(8.dp))
-            .focusable(true),
-        onSuccess = { /* no-op */ },
-        onError = { /* show subtle overlay? */ }
+        modifier = modifier
     )
-}
-
-@Composable
-private fun CarouselRow(
-    title: String,
-    items: List<CardItem>,
-    cardWidth: Dp,
-    cardHeight: Dp,
-    isTvChannel: Boolean = false,
-    eagerFirstImage: Boolean = false
-) {
-    Spacer(Modifier.height(8.dp))
-    androidx.compose.material3.Text(
-        text = title,
-        color = Color.White,
-        fontSize = 24.sp,
-        fontWeight = FontWeight.Medium,
-        modifier = Modifier.padding(start = 8.dp, bottom = 8.dp)
-    )
-    LazyRow(
-        contentPadding = PaddingValues(horizontal = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        items(items) { item ->
-            if (isTvChannel) {
-                TvChannelCard(item, width = cardWidth, height = cardHeight)
-            } else {
-                PosterProgressCard(item, width = cardWidth, height = cardHeight, eager = eagerFirstImage && items.first() == item)
-            }
-        }
-    }
-}
-
-@Composable
-private fun PosterProgressCard(item: CardItem, width: Dp, height: Dp, eager: Boolean) {
-    var focused by remember { mutableStateOf(false) }
-    val borderColor = if (focused) Color.White.copy(alpha = 0.7f) else Color.Transparent
-    Column(
-        modifier = Modifier
-            .width(width)
-            .height(height)
-            .clip(RoundedCornerShape(8.dp))
-            .background(Color(0xFF323131))
-            .onFocusChanged { focused = it.isFocused }
-            .focusable(true)
-            .padding(bottom = 8.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .width(width)
-                .height(height - 80.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .background(Color(0xFF2C2C2C))
-        ) {
-            AsyncImage(
-                model = ImageRequest.Builder(LocalContextProvider())
-                    .data(figmaImage(item.image)) // absolute file path
-                    .crossfade(true)
-                    .build(),
-                contentDescription = item.title,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clip(RoundedCornerShape(8.dp))
-                    .borderGlow(borderColor)
-            )
-            // Progress bar (static width sample)
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = 16.dp)
-                    .width(width - 38.dp)
-                    .height(18.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color(0xFF2C2C2C))
-            ) {
-                Box(
-                    modifier = Modifier
-                        .padding(4.dp)
-                        .width((width - 38.dp) * 0.4f)
-                        .height(10.dp)
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(Color(0xFFDE1717))
-                )
-            }
-        }
-        Box(
-            modifier = Modifier
-                .padding(start = 16.dp, top = 8.dp)
-        ) {
-            androidx.compose.material3.Text(
-                text = item.title,
-                color = Color.White,
-                fontSize = 20.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-    }
 }
 
 @Composable
 private fun TvChannelCard(item: CardItem, width: Dp, height: Dp) {
     var focused by remember { mutableStateOf(false) }
     val borderColor = if (focused) Color.White.copy(alpha = 0.7f) else Color.Transparent
+
     Row(
         modifier = Modifier
             .width(width)
@@ -368,12 +358,14 @@ private fun TvChannelCard(item: CardItem, width: Dp, height: Dp) {
             modifier = Modifier
                 .width(width / 2)
                 .height(height)
-                .clip(RoundedCornerShape(8.dp))
-                .background(Color(0xFF2C2C2C))
+                .clip(RoundedCornerShape(TvRadius.R8))
+                .background(TvColors.ProgressBg)
         ) {
+            // Base image
+            val context = androidx.compose.ui.platform.LocalContext.current
             AsyncImage(
-                model = ImageRequest.Builder(LocalContextProvider())
-                    .data(figmaImage(item.image)) // absolute file path
+                model = ImageRequest.Builder(context)
+                    .data(figmaImage(item.image))
                     .crossfade(true)
                     .build(),
                 contentDescription = item.title,
@@ -382,11 +374,11 @@ private fun TvChannelCard(item: CardItem, width: Dp, height: Dp) {
                     .matchParentSize()
                     .borderGlow(borderColor)
             )
-            // Optional overlay image on top (second source)
+            // Optional overlay image
             item.overlay?.let {
                 AsyncImage(
-                    model = ImageRequest.Builder(LocalContextProvider())
-                        .data(figmaImage(it)) // absolute file path
+                    model = ImageRequest.Builder(context)
+                        .data(figmaImage(it))
                         .crossfade(true)
                         .build(),
                     contentDescription = null,
@@ -394,32 +386,16 @@ private fun TvChannelCard(item: CardItem, width: Dp, height: Dp) {
                     modifier = Modifier.matchParentSize()
                 )
             }
-            // Play button
-            Box(
+
+            // Play button (circular)
+            TvIconButton(
+                size = 92.dp,
+                iconFileName = "figma_image_1_162.svg",
+                contentDescription = "Reproducir",
                 modifier = Modifier
-                    .size(92.dp)
                     .align(Alignment.CenterEnd)
                     .offset(x = (-24).dp)
-                    .clip(CircleShape)
-                    .background(Color.White.copy(alpha = 1f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(88.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFFC60000)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    // Simple play triangle
-                    Box(
-                        modifier = Modifier
-                            .size(40.dp, 42.dp)
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(Color.White.copy(alpha = 0.0f))
-                    )
-                }
-            }
+            )
 
             // Small progress
             Box(
@@ -428,20 +404,22 @@ private fun TvChannelCard(item: CardItem, width: Dp, height: Dp) {
                     .padding(16.dp)
                     .width(207.dp)
                     .height(10.dp)
-                    .clip(RoundedCornerShape(2.4.dp))
-                    .background(Color(0xFF2C2C2C).copy(alpha = 0.8f))
+                    .clip(RoundedCornerShape(TvRadius.R2_4))
+                    .background(TvColors.ProgressBg.copy(alpha = 0.8f))
             ) {
                 Box(
                     modifier = Modifier
                         .padding(0.8.dp)
                         .width(80.dp)
                         .height(8.8.dp)
-                        .clip(RoundedCornerShape(1.6.dp))
-                        .background(Color(0xFFDE1717))
+                        .clip(RoundedCornerShape(TvRadius.R1_6))
+                        .background(TvColors.ProgressFill)
                 )
             }
         }
+
         Spacer(Modifier.width(16.dp))
+
         Column(
             verticalArrangement = Arrangement.Center,
             modifier = Modifier
@@ -450,9 +428,7 @@ private fun TvChannelCard(item: CardItem, width: Dp, height: Dp) {
         ) {
             androidx.compose.material3.Text(
                 text = item.title,
-                color = Color.White,
-                fontSize = 28.sp,
-                fontWeight = FontWeight.Bold,
+                style = TvTypography.Typo25,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -460,8 +436,7 @@ private fun TvChannelCard(item: CardItem, width: Dp, height: Dp) {
                 Spacer(Modifier.height(6.dp))
                 androidx.compose.material3.Text(
                     text = it,
-                    color = Color.White,
-                    fontSize = 20.sp,
+                    style = TvTypography.Typo26,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -469,73 +444,10 @@ private fun TvChannelCard(item: CardItem, width: Dp, height: Dp) {
             Spacer(Modifier.height(6.dp))
             androidx.compose.material3.Text(
                 text = "11:30 - 12:30",
-                color = Color.White,
-                fontSize = 20.sp
+                style = TvTypography.Typo26
             )
             Spacer(Modifier.height(8.dp))
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(Color(0xFFEB0045))
-            ) {
-                androidx.compose.material3.Text(
-                    text = "EN VIVO",
-                    color = Color.White,
-                    fontSize = 18.sp,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                )
-            }
+            TagChip(label = "EN VIVO")
         }
     }
-}
-
-@Composable
-private fun Modifier.borderGlow(color: Color): Modifier {
-    return this.then(
-        Modifier
-            .clip(RoundedCornerShape(8.dp))
-            .background(Color.Transparent)
-            .then(
-                if (color.alpha > 0f)
-                    Modifier
-                        .background(color.copy(alpha = 0.15f), RoundedCornerShape(8.dp))
-                else Modifier
-            )
-    )
-}
-
-@Composable
-private fun StreamXTVTheme(content: @Composable () -> Unit) {
-    MaterialTheme(
-        colorScheme = androidx.compose.material3.darkColorScheme(
-            primary = Color(0xFF2196F3),
-            onPrimary = Color.White,
-            background = Color(0xFF121212),
-            onBackground = Color.White,
-            surface = Color(0xFF121212),
-            onSurface = Color.White
-        ),
-        typography = androidx.compose.material3.Typography(
-            bodyLarge = androidx.compose.material3.Typography().bodyLarge.copy(fontSize = 20.sp),
-            titleLarge = androidx.compose.material3.Typography().titleLarge.copy(fontSize = 32.sp, fontWeight = FontWeight.Bold)
-        ),
-        content = content
-    )
-}
-
-// Helper to get a context inside composables for ImageRequest builder
-@Composable
-private fun LocalContextProvider() = androidx.compose.ui.platform.LocalContext.current
-
-// Base absolute path for Figma images
-private const val FIGMA_IMAGES_ABS_PATH = "/home/kavia/workspace/code-generation/assets/figmaimages"
-
-/**
- * Build an absolute file path for figma images residing under FIGMA_IMAGES_ABS_PATH.
- * Accepts either a plain filename ("figma_image_1_13.png") or a relative path like
- * "figmaimages/figma_image_1_13.png" or "assets/figmaimages/figma_image_1_13.png".
- */
-private fun figmaImage(nameOrPath: String): File {
-    val fileName = nameOrPath.substringAfterLast('/')
-    return File(FIGMA_IMAGES_ABS_PATH, fileName)
 }
