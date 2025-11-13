@@ -1,1 +1,3 @@
-# streamx-ott-streaming-platform-90494
+# Project Repository
+
+This is the initial README file for the project.
